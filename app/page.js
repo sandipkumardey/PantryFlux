@@ -1,36 +1,59 @@
-'use client'
+'use client';
 import { useState, useEffect } from "react";
 import { firestore } from "@/firebase";
-import { Box, Modal, Typography, Stack, TextField, Button } from "@mui/material";
-import { collection, getDocs, doc, getDoc, setDoc, deleteDoc } from "firebase/firestore";
+import {
+  Box,
+  Modal,
+  Typography,
+  Stack,
+  TextField,
+  Button,
+  CircularProgress,
+  IconButton
+} from "@mui/material";
+import CloseIcon from '@mui/icons-material/Close'; // Import statement for CloseIcon
+import {
+  collection,
+  getDocs,
+  doc,
+  getDoc,
+  setDoc,
+  deleteDoc,
+  query,
+} from "firebase/firestore";
 
 export default function Home() {
   const [inventory, setInventory] = useState([]);
   const [open, setOpen] = useState(false);
-  const [itemName, setItemName] = useState('');
+  const [itemName, setItemName] = useState("");
+  const [loading, setLoading] = useState(false);
 
   // Function to update inventory list
   const updateInventory = async () => {
+    setLoading(true);
     try {
-      const snapshot = query(collection(firestore, 'inventory'));
-      const docs = await getDocs(snapshot);
+      const q = query(collection(firestore, "inventory")); 
+      const snapshot = await getDocs(q);
       const inventoryList = [];
-      docs.forEach(doc => {
+      snapshot.forEach((doc) => {
         inventoryList.push({
-          name: doc.id,      
+          name: doc.id,
           ...doc.data(),
         });
       });
       setInventory(inventoryList);
     } catch (error) {
       console.error("Error fetching inventory: ", error);
+    } finally {
+      setLoading(false);
     }
   };
 
   // Function to add an item
   const addItem = async (item) => {
+    setLoading(true);
     try {
-      const docRef = doc(collection(firestore, 'inventory'), item);
+      const docRef = doc(collection(firestore, "inventory"), item);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
@@ -43,13 +66,16 @@ export default function Home() {
       await updateInventory();
     } catch (error) {
       console.error("Error adding item: ", error);
+    } finally {
+      setLoading(false);
     }
   };
 
   // Function to remove an item
   const removeItem = async (item) => {
+    setLoading(true);
     try {
-      const docRef = doc(collection(firestore, 'inventory'), item);
+      const docRef = doc(collection(firestore, "inventory"), item);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
@@ -64,6 +90,8 @@ export default function Home() {
       await updateInventory();
     } catch (error) {
       console.error("Error removing item: ", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -72,89 +100,148 @@ export default function Home() {
     updateInventory();
   }, []);
 
-  // Handlers for opening and closing state
+  // Handlers for opening and closing modal
   const handleOpen = () => setOpen(true);
   const handleClose = () => setOpen(false);
 
   return (
-    <Box 
-      width="100vw" 
-      height="100vh" 
-      display="flex" 
-      flexDirection= "column"
-      justifyContent="center"
+    <Box
+      width="100vw"
+      height="100vh"
+      display="flex"
+      flexDirection="column"
       alignItems="center"
-      gap={2}
+      p={3}
+      bgcolor="#e5d9f2"
     >
-      <Modal
-        open={open} 
-        onClose={handleClose}
-      >
+      {/* Title and Subheadline */}
+      <Box mb={4} textAlign="center">
+        <Typography variant="h2" color="#00796b" gutterBottom>
+          Inventory Management
+        </Typography>
+        <Typography variant="h6" color="#666">
+          Track and manage your inventory items with ease
+        </Typography>
+      </Box>
+      
+      <Modal open={open} onClose={handleClose}>
         <Box
-          position="absolute" 
-          top="50%" 
+          position="fixed"
+          top="50%"
           left="50%"
           transform="translate(-50%, -50%)"
           width={400}
           bgcolor="white"
-          border="2px solid #000" // Fixed typo
+          borderRadius={2}
           boxShadow={24}
           p={4}
           display="flex"
           flexDirection="column"
           gap={3}
+          sx={{ outline: 'none' }}
         >
-          <Typography variant="h6">Add Item</Typography>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">Add Item</Typography>
+            <IconButton onClick={handleClose} color="primary">
+              <CloseIcon />
+            </IconButton>
+          </Box>
           <Stack width="100%" direction="row" spacing={2}>
-            <TextField 
-              variant='outlined'
+            <TextField
+              variant="outlined"
               fullWidth
-              value={itemName} // Corrected from `itemNames` to `itemName`
+              value={itemName}
               onChange={(e) => setItemName(e.target.value)}
+              label="Item Name"
             />
             <Button
-              variant="outlined" 
+              variant="contained"
+              color="primary"
               onClick={() => {
-                addItem(itemName);
-                setItemName('');
-                handleClose();
+                if (itemName.trim()) {
+                  addItem(itemName.trim());
+                  setItemName("");
+                  handleClose();
+                }
               }}
+              disabled={loading}
             >
-              Add
+              {loading ? <CircularProgress size={24} /> : "Add"}
             </Button>
           </Stack>
         </Box>
       </Modal>
-      <Button 
-        variant="contained"
-        onClick={handleOpen}
-      >
+      <Button variant="contained" color="primary" onClick={handleOpen} sx={{ mb: 3 }}>
         Add Item
       </Button>
-      <Box border="1px solid #333">
+      <Box
+        borderRadius={2}
+        bgcolor="white"
+        boxShadow={3}
+        width="100%"
+        maxWidth="800px"
+        p={2}
+      >
         <Box
-          width="800px"
           height="100px"
-          bgcolor="#ADD8E6"
+          bgcolor="#00796b"
           display="flex"
-          alignItems="center" 
+          alignItems="center"
           justifyContent="center"
+          borderRadius="8px 8px 0 0"
+          mb={2}
         >
-          <Typography variant="h2" color="#333">
+          <Typography variant="h4" color="white">
             Inventory Items
           </Typography>
         </Box>
-        <Stack width="800px" height="300px" spacing={2} overflow="auto"></Stack>
-          {inventory.map(({name, quantity})=> (
+        <Stack spacing={2} maxHeight="400px" overflow="auto">
+          {inventory.length === 0 && !loading ? (
+            <Typography variant="h6" color="#666" textAlign="center">
+              No items in inventory.
+            </Typography>
+          ) : (
+            inventory.map(({ name, quantity }) => (
               <Box
-                key={name} width="100%" minHeight="150px" display="flex"
-                alignItems="center" justifyContent="center"
-                bgcolor= '#f0f0f0'
-                padding={5}
+                key={name}
+                width="100%"
+                minHeight="100px"
+                display="flex"
+                alignItems="center"
+                justifyContent="space-between"
+                bgcolor="#e0f2f1"
+                borderRadius={2}
+                padding={2}
+                boxShadow={1}
               >
-                <Typography>{name}</Typography>
+                <Typography variant="h5" color="#00796b">
+                  {name.charAt(0).toUpperCase() + name.slice(1)}
+                </Typography>
+                <Typography variant="h5" color="#00796b">
+                  {quantity}
+                </Typography>
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Button 
+                    variant="contained"
+                    color="primary"
+                    onClick={() => addItem(name)}
+                    disabled={loading}
+                  >
+                    Add
+                  </Button>
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    onClick={() => removeItem(name)}
+                    disabled={loading}
+                  >
+                    Remove
+                  </Button>
+                </Stack>
               </Box>
-            ))}
+            ))
+          )}
+        </Stack>
       </Box>
     </Box>
   );
